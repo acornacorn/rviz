@@ -103,8 +103,10 @@ RenderSystem::RenderSystem()
 
 void RenderSystem::prepareOverlays(Ogre::SceneManager* scene_manager)
 {
+#if ((OGRE_VERSION_MAJOR == 1 && OGRE_VERSION_MINOR >= 9) || OGRE_VERSION_MAJOR >= 2 )
   if (ogre_overlay_system_)
     scene_manager->addRenderQueueListener(ogre_overlay_system_);
+#endif
 }
 
 void RenderSystem::setupDummyWindowId()
