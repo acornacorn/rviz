@@ -135,28 +135,11 @@ protected:
 
   // stereo rendering
   bool use_stereo_;
-#if 0
-  bool foo1;
-  bool foo2;
-  bool foo3;
-  bool foo4;
-  bool foo5;
-  bool foo6;
-  bool foo7;
-  bool foo8;
-  bool foo9;
-  bool fooa;
-  bool foob;
-#endif
-#if 1
   class StereoRenderTargetListener;
   float stereo_eye_distance_;
   Ogre::Camera* right_camera_;
   Ogre::Viewport* right_viewport_;
-#endif
-#if 1
   boost::shared_ptr<StereoRenderTargetListener> stereo_listener_;
-#endif
 };
 
 } // namespace rviz
