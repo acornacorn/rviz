@@ -356,6 +356,10 @@ Ogre::RenderWindow* RenderSystem::makeRenderWindow( intptr_t window_id, unsigned
   old_error_handler = XSetErrorHandler( &checkBadDrawable );
 #endif
 
+  // attempt to get a stereo window
+  // TODO: if this fails, turn it off and try again?
+  params["stereoMode"] = "Frame Sequential";
+
   int attempts = 0;
   while (window == NULL && (attempts++) < 100)
   {
@@ -401,6 +405,14 @@ Ogre::RenderWindow* RenderSystem::makeRenderWindow( intptr_t window_id, unsigned
     //window->setVisible(true);
     window->setAutoUpdated(false);
   }
+
+  ROS_INFO("Stereo is %s",
+#if OGRE_STEREO_ENABLE
+    (window->isStereoEnabled())?"ENABLED":"DISABLED"
+#else
+    "DISABLED (not supported in this version of Ogre)"
+#endif
+  );
 
   return window;
 }
