@@ -36,6 +36,7 @@
 #include <OgreRenderWindow.h>
 #include <OgreStringConverter.h>
 #include <OgreGpuProgramManager.h>
+#include <OgreRenderTargetListener.h>
 
 #include <ros/console.h>
 #include <ros/assert.h>
@@ -47,6 +48,58 @@
 namespace rviz
 {
 
+// This class is called when rendering begins.  It prepares the cameras for stereo rendering.
+class QtOgreRenderWindow::StereoRenderTargetListener : public Ogre::RenderTargetListener
+{
+public:
+  StereoRenderTargetListener(QtOgreRenderWindow* window,
+                             Ogre::RenderWindow *render_window);
+  ~StereoRenderTargetListener();
+  virtual void preRenderTargetUpdate(const Ogre::RenderTargetEvent& evt);
+  virtual void preViewportUpdate(const Ogre::RenderTargetViewportEvent& evt);
+private:
+  QtOgreRenderWindow *window_;
+  Ogre::RenderWindow *render_window_;
+};
+
+QtOgreRenderWindow::StereoRenderTargetListener::StereoRenderTargetListener(
+      QtOgreRenderWindow* window,
+      Ogre::RenderWindow *render_window)
+  : window_(window)
+  , render_window_(render_window)
+{
+  ROS_INFO("Create stereo listener window=%08lx render_window=%08lx",
+      (long)window_,
+      (long)render_window_);
+  render_window_->addListener(this);
+  ROS_INFO("Create stereo listener DONE");
+}
+
+QtOgreRenderWindow::StereoRenderTargetListener::~StereoRenderTargetListener()
+{
+  render_window_->removeListener(this);
+  window_->enableStereo(false);
+}
+
+void QtOgreRenderWindow::StereoRenderTargetListener::preRenderTargetUpdate(
+      const Ogre::RenderTargetEvent& evt)
+{
+  ROS_INFO("Pre render win=%08lx target=%08lx",
+      (long)window_,
+      (long)evt.source);
+}
+
+void QtOgreRenderWindow::StereoRenderTargetListener::preViewportUpdate(
+      const Ogre::RenderTargetViewportEvent& evt)
+{
+  ROS_INFO("Pre render win=%08lx                   viewport=%08lx",
+      (long)window_,
+      (long)evt.source);
+}
+
+//------------------------------------------------------------------------------
+
+
 QtOgreRenderWindow::QtOgreRenderWindow( QWidget* parent )
   : RenderWidget( RenderSystem::get(), parent )
   , viewport_( 0 )
@@ -56,6 +109,10 @@ QtOgreRenderWindow::QtOgreRenderWindow( QWidget* parent )
   , camera_( 0 )
   , overlays_enabled_( true ) // matches the default of Ogre::Viewport.
   , background_color_( Ogre::ColourValue::Black ) // matches the default of Ogre::Viewport.
+  , use_stereo_( false )
+  , right_camera_( 0 )
+  , right_viewport_( 0 )
+  , stereo_eye_distance_( 0 )
 {
   render_window_->setVisible(true);
   render_window_->setAutoUpdated(true);
@@ -64,10 +121,46 @@ QtOgreRenderWindow::QtOgreRenderWindow( QWidget* parent )
   viewport_->setOverlaysEnabled( overlays_enabled_ );
   viewport_->setBackgroundColour( background_color_ );
 
+  stereo_eye_distance_ = 0.03;
+  enableStereo(true);
+
   setCameraAspectRatio();
 }
 
 //------------------------------------------------------------------------------
+bool QtOgreRenderWindow::enableStereo (bool enable)
+{
+  bool was_enabled = use_stereo_;
+  use_stereo_ = enable && render_window_->isStereoEnabled();
+
+  if (use_stereo_ == was_enabled)
+    return was_enabled;
+
+  if (use_stereo_)
+  {
+    right_viewport_ = render_window_->addViewport( NULL, 1 );
+    stereo_listener_.reset(new QtOgreRenderWindow::StereoRenderTargetListener(this, render_window_));
+  }
+  else
+  {
+    stereo_listener_.reset();
+
+    render_window_->removeViewport(1);
+    right_viewport_ = NULL;
+
+    if (right_camera_)
+      right_camera_->getSceneManager()->destroyCamera( right_camera_ );
+    right_camera_ = NULL;
+  }
+
+  setOverlaysEnabled(overlays_enabled_);
+  setBackgroundColor(background_color_);
+  if (camera_)
+    setCamera(camera_);
+
+  return was_enabled;
+}
+
 Ogre::Viewport* QtOgreRenderWindow::getViewport () const
 {
   return viewport_;
@@ -75,6 +168,7 @@ Ogre::Viewport* QtOgreRenderWindow::getViewport () const
 
 void QtOgreRenderWindow::setCamera( Ogre::Camera* camera )
 {
+ROS_INFO("ACORN - setCamera on QtOgreRenderWindow %08lx",(long)(this));
   camera_ = camera;
   viewport_->setCamera( camera );
 

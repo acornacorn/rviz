@@ -30,6 +30,7 @@
 #define QT_OGRE_RENDER_WINDOW_OGRE_RENDER_WINDOW_H_
 
 #include <boost/function.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "render_widget.h"
 
@@ -95,6 +96,13 @@ public:
    */
   void setOrthoScale( float scale );
 
+  /** \brief Enable or disable stereo rendering
+   * If stereo is not supported this is ignored.
+   * @return the old setting (whether stereo was enabled before)
+   */
+  bool enableStereo(bool enable);
+
+
   void setAutoRender(bool auto_render) { auto_render_ = auto_render; }
 
   ////// Functions mimicked from Ogre::Viewport to satisfy timing of
@@ -124,6 +132,31 @@ protected:
   Ogre::Camera* camera_;
   bool overlays_enabled_;
   Ogre::ColourValue background_color_;
+
+  // stereo rendering
+  bool use_stereo_;
+#if 0
+  bool foo1;
+  bool foo2;
+  bool foo3;
+  bool foo4;
+  bool foo5;
+  bool foo6;
+  bool foo7;
+  bool foo8;
+  bool foo9;
+  bool fooa;
+  bool foob;
+#endif
+#if 1
+  class StereoRenderTargetListener;
+  float stereo_eye_distance_;
+  Ogre::Camera* right_camera_;
+  Ogre::Viewport* right_viewport_;
+#endif
+#if 1
+  boost::shared_ptr<StereoRenderTargetListener> stereo_listener_;
+#endif
 };
 
 } // namespace rviz
