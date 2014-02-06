@@ -56,6 +56,7 @@ public:
                              Ogre::RenderWindow *render_window);
   ~StereoRenderTargetListener();
   virtual void preRenderTargetUpdate(const Ogre::RenderTargetEvent& evt);
+  virtual void postRenderTargetUpdate(const Ogre::RenderTargetEvent& evt);
   virtual void preViewportUpdate(const Ogre::RenderTargetViewportEvent& evt);
 private:
   QtOgreRenderWindow *window_;
@@ -89,12 +90,22 @@ void QtOgreRenderWindow::StereoRenderTargetListener::preRenderTargetUpdate(
       (long)evt.source);
 }
 
+void QtOgreRenderWindow::StereoRenderTargetListener::postRenderTargetUpdate(
+      const Ogre::RenderTargetEvent& evt)
+{
+  ROS_INFO("Pst render win=%08lx target=%08lx",
+      (long)window_,
+      (long)evt.source);
+  window_->prepareStereoViewport(NULL);
+}
+
 void QtOgreRenderWindow::StereoRenderTargetListener::preViewportUpdate(
       const Ogre::RenderTargetViewportEvent& evt)
 {
   ROS_INFO("Pre render win=%08lx                   viewport=%08lx",
       (long)window_,
       (long)evt.source);
+  window_->prepareStereoViewport(evt.source);
 }
 
 //------------------------------------------------------------------------------
@@ -110,6 +121,7 @@ QtOgreRenderWindow::QtOgreRenderWindow( QWidget* parent )
   , overlays_enabled_( true ) // matches the default of Ogre::Viewport.
   , background_color_( Ogre::ColourValue::Black ) // matches the default of Ogre::Viewport.
   , use_stereo_( false )
+  , left_camera_( 0 )
   , right_camera_( 0 )
   , right_viewport_( 0 )
   , stereo_eye_distance_( 0 )
@@ -122,6 +134,7 @@ QtOgreRenderWindow::QtOgreRenderWindow( QWidget* parent )
   viewport_->setBackgroundColour( background_color_ );
 
   stereo_eye_distance_ = 0.03;
+  viewport_->setDrawBuffer(Ogre::CBT_BACK);
   enableStereo(true);
 
   setCameraAspectRatio();
@@ -139,6 +152,8 @@ bool QtOgreRenderWindow::enableStereo (bool enable)
   if (use_stereo_)
   {
     right_viewport_ = render_window_->addViewport( NULL, 1 );
+    right_viewport_->setDrawBuffer(Ogre::CBT_BACK_RIGHT);
+    viewport_->setDrawBuffer(Ogre::CBT_BACK_LEFT);
     stereo_listener_.reset(new QtOgreRenderWindow::StereoRenderTargetListener(this, render_window_));
   }
   else
@@ -147,6 +162,12 @@ bool QtOgreRenderWindow::enableStereo (bool enable)
 
     render_window_->removeViewport(1);
     right_viewport_ = NULL;
+
+    viewport_->setDrawBuffer(Ogre::CBT_BACK);
+
+    if (left_camera_)
+      left_camera_->getSceneManager()->destroyCamera( left_camera_ );
+    left_camera_ = NULL;
 
     if (right_camera_)
       right_camera_->getSceneManager()->destroyCamera( right_camera_ );
@@ -161,6 +182,58 @@ bool QtOgreRenderWindow::enableStereo (bool enable)
   return was_enabled;
 }
 
+// This is intended to only be called from StereoRenderTargetListener::preViewportUpdate
+void QtOgreRenderWindow::prepareStereoViewport( Ogre::Viewport* viewport )
+{
+  Ogre::Camera *camera;
+  float offset = stereo_eye_distance_;
+
+  ROS_INFO("prepareStereoViewport win=%08lx        viewport=%08lx (%s)",
+    (long)this,
+    (long)viewport,
+    viewport == NULL ? "NULL" :
+    viewport == viewport_ ? "LEFT" :
+    viewport == right_viewport_ ? "RIGHT" :
+    "???");
+  ROS_INFO("  _camera       = %08lx",(long)camera_);
+  ROS_INFO("  left_camera_  = %08lx",(long)left_camera_);
+  ROS_INFO("  right_camera_ = %08lx",(long)right_camera_);
+
+  if (viewport == NULL)
+  {
+    viewport_->setCamera( camera_ );
+    return;
+  }
+  if (viewport == viewport_)
+  {
+    camera = left_camera_;
+  }
+  else if (viewport == right_viewport_)
+  {
+    camera = right_camera_;
+    offset = -offset;
+  }
+  else
+  {
+    ROS_ERROR("QtOgreRenderWindow::getViewport() called with bad viewport");
+    return;
+  }
+
+  if (camera_->getProjectionType() != Ogre::PT_PERSPECTIVE || !camera)
+  {
+    viewport->setCamera( camera_ );
+    return;
+  }
+
+  ROS_INFO("AAA1 camera=%08lx  camera_=%08lx",(long)camera, (long)camera_);
+  camera->synchroniseBaseSettingsWith(camera_);
+  ROS_INFO("AAA2");
+  camera->setFrustumOffset(offset, 0.0);
+  ROS_INFO("AAA3 vp=%08lx",(long)viewport);
+  viewport->setCamera(camera);
+  ROS_INFO("AAA4");
+}
+
 Ogre::Viewport* QtOgreRenderWindow::getViewport () const
 {
   return viewport_;
@@ -168,11 +241,25 @@ Ogre::Viewport* QtOgreRenderWindow::getViewport () const
 
 void QtOgreRenderWindow::setCamera( Ogre::Camera* camera )
 {
-ROS_INFO("ACORN - setCamera on QtOgreRenderWindow %08lx",(long)(this));
+ROS_INFO("ACORN - setCamera=%08lx on QtOgreRenderWindow %08lx",(long)camera, (long)(this));
   camera_ = camera;
   viewport_->setCamera( camera );
 
   setCameraAspectRatio();
+
+  if (camera_ && use_stereo_)
+  {
+    if (!left_camera_)
+    {
+      left_camera_ = camera_->getSceneManager()->createCamera(camera_->getName() + "-left");
+      ROS_INFO("Created left cam %08lx",(long)left_camera_);
+    }
+    if (!right_camera_)
+    {
+      right_camera_ = camera_->getSceneManager()->createCamera(camera_->getName() + "-right");
+      ROS_INFO("Created right cam %08lx",(long)right_camera_);
+    }
+  }
 
   update();
 }
@@ -181,12 +268,16 @@ void QtOgreRenderWindow::setOverlaysEnabled( bool overlays_enabled )
 {
   overlays_enabled_ = overlays_enabled;
   viewport_->setOverlaysEnabled( overlays_enabled );
+  if (right_viewport_)
+    right_viewport_->setOverlaysEnabled( overlays_enabled );
 }
 
 void QtOgreRenderWindow::setBackgroundColor( Ogre::ColourValue background_color )
 {
   background_color_ = background_color;
   viewport_->setBackgroundColour( background_color );
+  if (right_viewport_)
+    right_viewport_->setBackgroundColour( background_color );
 }
 
 void QtOgreRenderWindow::setCameraAspectRatio()
@@ -240,7 +331,9 @@ void QtOgreRenderWindow::paintEvent( QPaintEvent* e )
       ogre_root_->_fireFrameRenderingQueued();
 #endif
 
+      ROS_INFO("BEGIN Paint event update");
       render_window_->update();
+      ROS_INFO("END   Paint event update");
 
       ogre_root_->_fireFrameEnded();
     }

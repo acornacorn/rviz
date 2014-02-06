@@ -102,7 +102,6 @@ public:
    */
   bool enableStereo(bool enable);
 
-
   void setAutoRender(bool auto_render) { auto_render_ = auto_render; }
 
   ////// Functions mimicked from Ogre::Viewport to satisfy timing of
@@ -119,6 +118,13 @@ protected:
    */
   void setCameraAspectRatio();
 
+  /**
+   * prepare a viewport's camera for stereo rendering.
+   * This should only be called from StereoRenderTargetListener
+   */
+  void prepareStereoViewport(Ogre::Viewport*);
+
+
   Ogre::Viewport* viewport_;
 
   Ogre::Root* ogre_root_;
@@ -134,12 +140,15 @@ protected:
   Ogre::ColourValue background_color_;
 
   // stereo rendering
-  bool use_stereo_;
   class StereoRenderTargetListener;
+  friend class StereoRenderTargetListener;
+  boost::shared_ptr<StereoRenderTargetListener> stereo_listener_;
+  bool use_stereo_;
   float stereo_eye_distance_;
+  Ogre::Camera* left_camera_;
   Ogre::Camera* right_camera_;
   Ogre::Viewport* right_viewport_;
-  boost::shared_ptr<StereoRenderTargetListener> stereo_listener_;
+  // viewport_ is used as the left viewport
 };
 
 } // namespace rviz
