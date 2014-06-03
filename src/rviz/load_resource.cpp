@@ -82,7 +82,7 @@ QPixmap loadPixmap( QString url, bool fill_cache )
     ROS_DEBUG_NAMED( "load_resource", "Loading '%s'", path.string().c_str() );
     if ( !pixmap.load( QString::fromStdString( path.string() ) ) )
     {
-      ROS_ERROR( "Could not load pixmap '%s'", path.string().c_str() );
+      ROS_DEBUG( "Could not load pixmap '%s'", path.string().c_str() );
     }
   }
 
@@ -104,7 +104,7 @@ QCursor makeIconCursor( QString url, bool fill_cache )
   QPixmap icon = loadPixmap( url, fill_cache );
   if (icon.width() == 0 || icon.height() == 0)
   {
-    ROS_ERROR( "Could not load pixmap '%s' -- using default cursor instead.", url.toStdString().c_str() );
+    ROS_DEBUG( "Could not load pixmap '%s' -- using default cursor instead.", url.toStdString().c_str() );
     return getDefaultCursor();
   }
   QString cache_key = url + ".cursor";
