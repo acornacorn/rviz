@@ -339,6 +339,11 @@ void ViewController::updateStereoProperties()
 
 void ViewController::updateCameraForStereoRendering()
 {
+printf("stereo=%d  autoset=%d  viewport=%08lx\n",
+stereo_enable_->getBool()?1:0,
+autoset_stereo_properties_->getBool()?1:0,
+(long)camera_->getViewport());
+
   if (!stereo_enable_->getBool())
     return;
   const Ogre::Viewport *viewport = camera_->getViewport();
@@ -386,15 +391,25 @@ void ViewController::updateCameraForStereoRendering()
   Ogre::Real world_width_at_focal = tanThetaX * focal_len_world * 2.0f;
 
   Ogre::Real width_pixels = (Ogre::Real)viewport->getActualWidth();
-  Ogre::Real width_phys_meters = width_pixels * phys_dpm;
+  Ogre::Real width_phys_meters = width_pixels / phys_dpm;
   if (width_phys_meters <= std::numeric_limits<float>::epsilon())
     width_phys_meters = 0.30;
   Ogre::Real phys_to_world = world_width_at_focal / width_phys_meters;
   
-  Ogre::Real eye_sep_world = phys_eye_sep * phys_to_world;
+  Ogre::Real eye_sep_world = phys_eye_sep / phys_to_world;
+
+
+printf("dist=%7.3f fovy=%7.3f deg  tanThetaX=%7.3f world_width_at_focal=%7.3f  width_pixels=%7.3f  width_phys_meters=%7.3f phys_to_world=%7.3f eye_sep_world=%7.3f\n",
+(double)dist,
+(double)fovy.valueDegrees(),
+(double)tanThetaX,
+(double)world_width_at_focal,
+(double)width_pixels,
+(double)width_phys_meters,
+(double)phys_to_world,
+(double)eye_sep_world);
 
   avoid_stereo_update_ = true;
-
   if (phys_to_world > std::numeric_limits<float>::epsilon())
   {
     phys_screen_dist = focal_len_world / phys_to_world;
