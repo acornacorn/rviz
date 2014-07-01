@@ -230,4 +230,11 @@ void RenderPanel::sceneManagerDestroyed( Ogre::SceneManager* destroyed_scene_man
   }
 }
 
+void RenderPanel::preViewportUpdate(const Ogre::RenderTargetViewportEvent& evt)
+{
+  if (view_controller_)
+    view_controller_->updateCameraForStereoRendering();
+  QtOgreRenderWindow::preViewportUpdate(evt);
+}
+
 } // namespace rviz

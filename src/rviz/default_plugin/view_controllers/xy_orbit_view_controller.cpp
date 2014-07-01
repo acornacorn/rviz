@@ -217,6 +217,7 @@ void XYOrbitViewController::lookAt( const Ogre::Vector3& point )
   focal_point_property_->setVector( new_focal_point );
 
   calculatePitchYawFromPosition(camera_position);
+  setLookAt(point);
 }
 
 } // end namespace rviz

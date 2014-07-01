@@ -101,8 +101,14 @@ public:
 
   /** @brief This should be implemented in each subclass to aim the
    * camera at the given point in space (relative to the fixed
-   * frame). */
-  virtual void lookAt( const Ogre::Vector3& point ) {}
+   * frame).
+   * Subclasses must call setLookAt() when the focus point changes either
+   * because of this call or for any other reason (e.g. panning). */
+  virtual void lookAt( const Ogre::Vector3& point );
+
+  /** @brief This should be called by each subclass when the focus point
+   * changes. */
+  void setLookAt( const Ogre::Vector3& point );
 
   /** Reset the view controller to some sane initial state, like
    * looking at 0,0,0 from a few meters away. */
@@ -129,6 +135,9 @@ public:
 
   /** @brief Subclasses should call this whenever a change is made which would change the results of toString(). */
   void emitConfigChanged();
+
+  /** @brief When rendering in stereo, called before each frame. */
+  virtual void updateCameraForStereoRendering();
 
   Ogre::Camera* getCamera() const { return camera_; }
 
@@ -189,6 +198,10 @@ protected:
   FloatProperty* near_clip_property_;
   BoolProperty* stereo_enable_;
   BoolProperty* stereo_eye_swap_;
+  BoolProperty* autoset_stereo_properties_;
+  FloatProperty* window_dpi_;
+  FloatProperty* physical_eye_separation_;
+  FloatProperty* physical_screen_distance_;
   FloatProperty* stereo_eye_separation_;
   FloatProperty* stereo_focal_distance_;
 
@@ -201,6 +214,13 @@ private:
 
   // Default cursors for the most common actions
   QMap<CursorType,QCursor> standard_cursors_;
+
+  // avoid updateStereoProperties() when not needed.
+  bool avoid_stereo_update_;
+
+  // focus point, used for stereo rendering
+  // Avoid use of Ogre::Vector3 to work around dependency issue.
+  float look_at_[3];
 };
 
 } // end namespace rviz

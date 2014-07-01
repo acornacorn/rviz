@@ -200,6 +200,7 @@ void FPSViewController::lookAt( const Ogre::Vector3& point )
 {
   camera_->lookAt( point );
   setPropertiesFromCamera( camera_ );
+  setLookAt(point);
 }
 
 void FPSViewController::onTargetFrameChanged(const Ogre::Vector3& old_reference_position, const Ogre::Quaternion& old_reference_orientation)

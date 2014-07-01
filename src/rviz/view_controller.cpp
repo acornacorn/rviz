@@ -32,6 +32,7 @@
 #include <QKeyEvent>
 
 #include <OgreCamera.h>
+#include <OgreViewport.h>
 #include <OgreSceneManager.h>
 #include <OgreSceneNode.h>
 
@@ -58,6 +59,7 @@ ViewController::ViewController()
   , camera_( NULL )
   , is_active_( false )
   , type_property_( NULL )
+  , avoid_stereo_update_( false )
 {
   near_clip_property_ = new FloatProperty( "Near Clip Distance", 0.01f,
                                       "Anything closer to the camera than this threshold will not get rendered.",
@@ -73,11 +75,27 @@ ViewController::ViewController()
   stereo_eye_swap_ = new BoolProperty( "Swap Stereo Eyes", false,
                                       "Swap eyes if the monitor shows the left eye on the right.",
                                       stereo_enable_, SLOT( updateStereoProperties() ), this );
+  autoset_stereo_properties_ = new BoolProperty( "Autoset stereo properties", true,
+                                      "Set eye separation and focal distance automatically based on rviz focal point.",
+                                      stereo_enable_, SLOT( updateStereoProperties() ), this );
+  window_dpi_ = new FloatProperty( "Window DPI", 81.0f,
+                                      "Dots per inch on screen.  Used to autoset stereo properties."
+                                      " Divide width_in_pixels over width_in_inches."
+                                      " A 27inch 1920x1080 monitor is about 81dpi.",
+                                      stereo_enable_, SLOT( updateStereoProperties() ), this );
+  physical_eye_separation_ = new FloatProperty( "Physical Eye Width", 0.05f,
+                                      "Physical distance between viewer's eyes in the real world.",
+                                      stereo_enable_, SLOT( updateStereoProperties() ), this );
+  physical_screen_distance_ = new FloatProperty( "Physical Screen Distance", 0.60f,
+                                      "Physical distance from viewer to screen in the real world.",
+                                      stereo_enable_, SLOT( updateStereoProperties() ), this );
   stereo_eye_separation_ = new FloatProperty( "Stereo Eye Separation", 0.06f,
-                                      "Distance between eyes for stereo rendering.",
+                                      "Distance between eyes for stereo rendering.  Set automatically"
+                                      " if \"Autoset stereo properties\" is true.",
                                       stereo_enable_, SLOT( updateStereoProperties() ), this );
   stereo_focal_distance_ = new FloatProperty( "Stereo Focal Distance", 1.0f,
-                                      "Distance from eyes to screen.  For stereo rendering.",
+                                      "Distance from eyes to screen.  For stereo rendering.  Set"
+                                      " automatically if \"Autoset stereo properties\" is true.",
                                       stereo_enable_, SLOT( updateStereoProperties() ), this );
 }
 
@@ -240,6 +258,18 @@ void ViewController::lookAt( float x, float y, float z )
   lookAt( point );
 }
 
+void ViewController::lookAt( const Ogre::Vector3& point )
+{
+  setLookAt(point);
+}
+
+void ViewController::setLookAt( const Ogre::Vector3& point )
+{
+  look_at_[0] = point.x;
+  look_at_[1] = point.y;
+  look_at_[2] = point.z;
+}
+
 void ViewController::setStatus( const QString & message )
 {
   if ( context_ )
@@ -256,7 +286,64 @@ void ViewController::updateNearClipDistance()
 
 void ViewController::updateStereoProperties()
 {
-  if (stereo_enable_->getBool())
+  if (avoid_stereo_update_)
+    return;
+
+  if (stereo_enable_->getBool() &&
+      camera_->getProjectionType() == Ogre::PT_PERSPECTIVE)
+  {
+#if 0
+    // These are now set in updateCameraForStereoRendering()
+    float focal_dist = stereo_focal_distance_->getFloat();
+    float eye_sep = stereo_eye_swap_->getBool() ?
+                    -stereo_eye_separation_->getFloat() :
+                    stereo_eye_separation_->getFloat();
+    camera_->setFrustumOffset(0.5f * eye_sep, 0.0f);
+    camera_->setFocalLength(focal_dist);
+#endif
+
+    stereo_eye_swap_->show();
+    stereo_eye_separation_->show();
+    stereo_focal_distance_->show();
+    autoset_stereo_properties_->show();
+    if (autoset_stereo_properties_->getBool())
+    {
+      window_dpi_->show();
+      physical_eye_separation_->show();
+      physical_screen_distance_->show();
+      stereo_eye_separation_->setReadOnly(true);
+      stereo_focal_distance_->setReadOnly(true);
+    }
+    else
+    {
+      window_dpi_->hide();
+      physical_eye_separation_->hide();
+      physical_screen_distance_->hide();
+      stereo_eye_separation_->setReadOnly(false);
+      stereo_focal_distance_->setReadOnly(false);
+    }
+  }
+  else
+  {
+    camera_->setFrustumOffset(0.0f,0.0f);
+    camera_->setFocalLength(1.0f);
+    stereo_eye_swap_->hide();
+    autoset_stereo_properties_->hide();
+    window_dpi_->hide();
+    physical_eye_separation_->hide();
+    physical_screen_distance_->hide();
+    stereo_eye_separation_->hide();
+    stereo_focal_distance_->hide();
+  }
+}
+
+void ViewController::updateCameraForStereoRendering()
+{
+  if (!stereo_enable_->getBool())
+    return;
+  const Ogre::Viewport *viewport = camera_->getViewport();
+  if (!autoset_stereo_properties_->getBool() ||
+      !viewport)
   {
     float focal_dist = stereo_focal_distance_->getFloat();
     float eye_sep = stereo_eye_swap_->getBool() ?
@@ -264,19 +351,64 @@ void ViewController::updateStereoProperties()
                     stereo_eye_separation_->getFloat();
     camera_->setFrustumOffset(0.5f * eye_sep, 0.0f);
     camera_->setFocalLength(focal_dist);
-    stereo_eye_swap_->show();
-    stereo_eye_separation_->show();
-    stereo_focal_distance_->show();
+    return;
   }
-  else
-  {
-    camera_->setFrustumOffset(0.0f,0.0f);
-    camera_->setFocalLength(1.0f);
-    stereo_eye_swap_->hide();
-    stereo_eye_separation_->hide();
-    stereo_focal_distance_->hide();
-  }
-}
 
+  static const float INCH_PER_METER = 39.3701f;
+
+  float phys_dpm = window_dpi_->getFloat() * INCH_PER_METER;
+  float phys_eye_sep = physical_eye_separation_->getFloat();
+
+  // TODO: try setting field of view based on physical screen distance?
+  float phys_screen_dist = physical_screen_distance_->getFloat();
+
+  const Ogre::Vector3& pos = camera_->getRealPosition();
+  Ogre::Vector3 dir = camera_->getRealDirection();
+  dir.normalise();
+
+  // find new look_at_ that is on the look ray
+  Ogre::Vector3 look_at(look_at_[0], look_at_[1], look_at_[2]);
+  Ogre::Vector3 dir2 = look_at - pos;
+  Ogre::Real dist = dir2.length();
+  Ogre::Vector3 look_at2 = pos + (dir * dist);
+
+  // Some view controllers may not call setLookAt(), so update look_at_ if
+  // necessary.
+  static const float mm = 0.001;
+  if ((look_at2 - look_at).squaredLength() > mm*mm)
+    setLookAt(look_at);
+
+  // force focal length to be half way to object
+  Ogre::Real focal_len_world = dist * 0.5f;
+
+  Ogre::Radian fovy = camera_->getFOVy();
+  Ogre::Real tanThetaX = Ogre::Math::Tan(camera_->getFOVy()) * camera_->getAspectRatio();
+  Ogre::Real world_width_at_focal = tanThetaX * focal_len_world * 2.0f;
+
+  Ogre::Real width_pixels = (Ogre::Real)viewport->getActualWidth();
+  Ogre::Real width_phys_meters = width_pixels * phys_dpm;
+  if (width_phys_meters <= std::numeric_limits<float>::epsilon())
+    width_phys_meters = 0.30;
+  Ogre::Real phys_to_world = world_width_at_focal / width_phys_meters;
+  
+  Ogre::Real eye_sep_world = phys_eye_sep * phys_to_world;
+
+  avoid_stereo_update_ = true;
+
+  if (phys_to_world > std::numeric_limits<float>::epsilon())
+  {
+    phys_screen_dist = focal_len_world / phys_to_world;
+    physical_screen_distance_->setReadOnly(true);
+    physical_screen_distance_->setValue(phys_screen_dist);
+  }
+  stereo_eye_separation_->setValue(eye_sep_world);
+  stereo_focal_distance_->setValue(focal_len_world);
+  avoid_stereo_update_ = false;
+  float eye_sep = stereo_eye_swap_->getBool() ?
+                  -eye_sep_world :
+                  eye_sep_world;
+  camera_->setFrustumOffset(0.5f * eye_sep, 0.0f);
+  camera_->setFocalLength(focal_len_world);
+}
 
 } // end namespace rviz

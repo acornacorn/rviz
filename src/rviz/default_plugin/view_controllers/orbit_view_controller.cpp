@@ -236,6 +236,7 @@ void OrbitViewController::lookAt( const Ogre::Vector3& point )
   distance_property_->setFloat( focal_point_property_->getVector().distance( camera_position ));
 
   calculatePitchYawFromPosition(camera_position);
+  setLookAt(point);
 }
 
 void OrbitViewController::onTargetFrameChanged(const Ogre::Vector3& old_reference_position, const Ogre::Quaternion& old_reference_orientation)

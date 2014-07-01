@@ -148,6 +148,8 @@ void QtOgreRenderWindow::preViewportUpdate(
   const Ogre::Vector3 right = camera_->getRight();
   const Ogre::Vector3 up = camera_->getUp();
 
+  
+
   if (viewport == right_viewport_)
   {
     if (camera_->getProjectionType() != Ogre::PT_PERSPECTIVE || !right_camera_)

@@ -62,7 +62,7 @@ public:
   /** @brief Write into config data equivalent to the last config sent to load(). */
   virtual void save( Config config ) const;
 
-  virtual void lookAt( const Ogre::Vector3& point ) {}
+  virtual void lookAt( const Ogre::Vector3& point ) { setLookAt(point); }
   virtual void reset() {}
 
 private:

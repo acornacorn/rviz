@@ -253,6 +253,7 @@ void OrbitCamera::lookAt( const Ogre::Vector3& point )
 {
   Ogre::Vector3 focal_point = point;
   Ogre::Vector3 camera_position = camera_->getPosition();
+  setLookAt(point);
 
   if ( relative_node_ )
   {

@@ -119,6 +119,9 @@ protected:
 
   virtual void keyPressEvent( QKeyEvent* event );
 
+  // When stereo is enabled, this is called before rendering each viewport.
+  virtual void preViewportUpdate(const Ogre::RenderTargetViewportEvent& evt);
+
   // Mouse handling
   int mouse_x_;                                           ///< X position of the last mouse event
   int mouse_y_;                                           ///< Y position of the last mouse event
