@@ -165,6 +165,7 @@ private Q_SLOTS:
 
   void updateNearClipDistance();
   void updateStereoProperties();
+  void changeLookAtDistance();
 
 protected:
   /** @brief Do subclass-specific initialization.  Called by
@@ -204,6 +205,22 @@ protected:
   FloatProperty* physical_screen_distance_;
   FloatProperty* stereo_eye_separation_;
   FloatProperty* stereo_focal_distance_;
+
+	
+  FloatProperty* fovy_degrees_;
+  BoolProperty* auto_fov_;
+  FloatProperty* look_at_distance_;
+  BoolProperty* use_focal_len_ratio_;
+  FloatProperty* focal_len_ratio_;
+  FloatProperty* focal_len_world_meters_;
+  FloatProperty* physical_screen_distance2_;
+
+  FloatProperty* ph_screen_width_;
+  FloatProperty* ph_focal_dist_;
+  FloatProperty* ph_obj_dist_;
+  FloatProperty* wo_screen_width_;
+  FloatProperty* wo_focal_dist_;
+  FloatProperty* wo_obj_dist_;
 
   void setStatus( const QString & message );
 
