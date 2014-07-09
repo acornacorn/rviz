@@ -339,11 +339,6 @@ void ViewController::updateStereoProperties()
 
 void ViewController::updateCameraForStereoRendering()
 {
-printf("stereo=%d  autoset=%d  viewport=%08lx\n",
-stereo_enable_->getBool()?1:0,
-autoset_stereo_properties_->getBool()?1:0,
-(long)camera_->getViewport());
-
   if (!stereo_enable_->getBool())
     return;
   const Ogre::Viewport *viewport = camera_->getViewport();
